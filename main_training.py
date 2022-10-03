@@ -618,8 +618,11 @@ def fsdp_main(args):
 
             if rank == 0:
                 print(f"--> saving model ...")
+                #currEpoch = (
+                #    "-" + str(epoch) + "-" + str(round(curr_val_loss.item(), 4)) + ".pt"
+                #)
                 currEpoch = (
-                    "-" + str(epoch) + "-" + str(round(curr_val_loss.item(), 4)) + ".pt"
+                    "-" + str(epoch) + ".pt"
                 )
                 save_name = file_save_name + "-" + time_of_run + "-" + currEpoch
 
