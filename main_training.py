@@ -24,6 +24,9 @@ import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 
+from torch.distributed.elastic.multiprocessing.errors import record
+
+
 from torch.distributed.fsdp import (
     FullyShardedDataParallel as FSDP,
     CPUOffload,
@@ -127,7 +130,7 @@ def get_policies(cfg, fsdp_unit_params=1000000):
 
     wrapping_policy = policies.get_t5_wrapper()
     #wrapping_policy = policies. get_size_policy(2e8)
-    
+
 
     return mixed_precision_policy, wrapping_policy
 
@@ -271,10 +274,10 @@ def sync_all_device():
     # do device sync here
     for d in range(torch.cuda.device_count()):
         torch.cuda.synchronize(d)
-        
+
 # ---- fsdp main ------------------------------------------------------------
 
-
+@record
 def fsdp_main(args):
     """main process,  within each rank process"""
 
@@ -381,7 +384,7 @@ def fsdp_main(args):
         model.gradient_checkpointing_enable()
         if rank == 0:
             print(f"HF Activation checkpointing enabled\n")
-            
+
     model_config = model.config
     embedding_size = (model.state_dict()["shared.weight"].shape)[1]
     FLOP = calc_flop(cfg, model_config, cfg.model_max_length, embedding_size)
@@ -406,7 +409,7 @@ def fsdp_main(args):
 
         if rank == 0:
             print(f"Model in BF16, all training in BF16")
-            
+
 
     model = FSDP(
         model,
@@ -425,7 +428,7 @@ def fsdp_main(args):
             f"Rate Limiting is {cfg.use_rate_limiter}, inflight count = {cfg.inflight_max}"
         )
         memmax = performance.Memory_Maximizer()
-        
+
      # fsdp must do the checkpointing after sharding...
     if cfg.fsdp_activation_checkpointing:
         policies.apply_fsdp_checkpointing(model)
@@ -545,9 +548,9 @@ def fsdp_main(args):
         fn = cfg.model_name + "memory_tracking.txt"
         mem_alloc_tracker = []
         mem_reserved_tracker = []
-        
+
     start_training_time = time.time()
-    
+
     for epoch in range(1, epochs + 1):
         if rank == 0:
             print(f"\n--> Starting Epoch {epoch}")
@@ -565,10 +568,10 @@ def fsdp_main(args):
             sampler=sampler1,
             profiler=torch_profiler,
         )
-        
+
         if rank == 0:
             memmax.update()
-            
+
         if cfg.run_validation:
             curr_val_loss = validation(model, local_rank, rank, world_size, test_loader)
 
@@ -578,10 +581,10 @@ def fsdp_main(args):
             print(f"--> epoch {epoch} completed...entering save and stats zone")
             total_epoch_time = time.time() - t0
             print(f"epoch_time = {total_epoch_time}")
-            
-            
+
+
             dur.append(time.time() - t0)
-            
+
             train_acc_tracking.append(train_accuracy.item())
 
             if cfg.run_validation:
@@ -594,11 +597,12 @@ def fsdp_main(args):
                 mem_reserved_tracker.append(
                     format_metrics_to_gb(torch.cuda.memory_reserved())
                 )
-                
+
             net_flops = format_stats(FLOP / 10**12 / total_epoch_time, rounding=6)
             print(f"TFLOP/s/GPU: {net_flops}")
 
-        if cfg.save_model and curr_val_loss < best_val_loss:
+        #if cfg.save_model and curr_val_loss < best_val_loss:
+        if cfg.save_model:
             # update curr best val accuracy
 
             # save
@@ -649,7 +653,7 @@ def fsdp_main(args):
             gflops_gpu = FLOP / 10**9 * np.reciprocal(np.array(delays))
             tflops_gpu = FLOP / 10**12 * np.reciprocal(np.array(delays))
             print(f"gflops per gpu={gflops_gpu}")
-            
+
 
     # init_end_event.record()
     if rank == 0:
@@ -678,7 +682,7 @@ def fsdp_main(args):
         if cfg.use_rate_limiter:
             print(f"Rate Limit = {cfg.inflight_max}\n")
         print(f"Batch size = {cfg.batch_size}")
-        
+
         if rank == 0:
 
             # print("LEN Tflops",len(tflops_gpu), sum(tflops_gpu), tflops_gpu)

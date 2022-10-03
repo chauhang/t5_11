@@ -25,20 +25,20 @@ class train_config:
     # google/t5-v1_1-large
     # google/t5-v1_1-xl  #3b
     # google/t5-v1_1-xxl #11b
-    
+
     model_max_length = 512
-    
+
     #mixed precision
     use_mixed_precision: bool = True
     use_fp16: bool = False
-        
+
     # save models
-    save_model: bool = False
+    save_model: bool = True #False
     save_folder = "training_checkpoints"
     checkpoint_max_save_count: int = (
         2  # number of 'best' checkpoints to save based on val loss
     )
-    
+
     # model weights
     model_in_bf16 = False
 
@@ -62,7 +62,7 @@ class train_config:
 
     # policies
     fsdp_unit_size = 1000000
-    
+
 
     # activation checkpointing
     hf_activation_checkpointing: bool = False
@@ -73,7 +73,7 @@ class train_config:
     dataset_test = "datasets_grammar/grammar_validation.csv"
 
     # training
-    batch_size: int = 1
+    batch_size: int = 2
     num_epochs: int = 2
 
     # validation

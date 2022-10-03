@@ -32,6 +32,9 @@ import torch.multiprocessing as mp
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.utils.data.distributed import DistributedSampler
 
+from torch.distributed.elastic.multiprocessing.errors import record
+
+
 from torch.distributed.fsdp import (
     FullyShardedDataParallel as FSDP,
     CPUOffload,
@@ -306,7 +309,7 @@ def sync_all_device():
 
 # ---- fsdp main ------------------------------------------------------------
 
-
+@record
 def fsdp_main(args):
     """main process within each process"""
     cfg = config.benchmark_config()  # loads from defaults
@@ -373,8 +376,8 @@ def fsdp_main(args):
     else:
         model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     init_time_end = time.perf_counter()
-    
-    
+
+
 
     # summarization
     # model = T5ForConditionalGeneration.from_pretrained(model_name)
@@ -469,7 +472,7 @@ def fsdp_main(args):
     )
     init_fsdp_time_end = time.perf_counter()
     #print(f" fsdp initialization time {round(init_fsdp_time_end-init_fsdp_time_start, 4)} seconds")
-    
+
     # print(f"IMPORTANT - No mixed precision policy -fp32 running")
     # move model to gpu
     # model.to(local_rank)
@@ -761,7 +764,7 @@ if __name__ == "__main__":
         delimiter=",",
     )
     print(f"temp dset loaded in main = len {len(temp_full_dataset)}")
-    
+
 
     mp.spawn(
         fsdp_main,
